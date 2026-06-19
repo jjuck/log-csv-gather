@@ -1,0 +1,18 @@
+role: uploader
+pc_id: field-pc-01
+group_name: Array_MIC
+machine_id: 성능검사기_1
+drive_root_folder_id: replace-with-google-drive-folder-id
+source_root: "E:\\"
+state_dir: "C:\\log-csv-gather\\state\\uploader"
+credentials_file: "C:\\log-csv-gather\\secrets\\oauth-client.json"
+token_file: "C:\\log-csv-gather\\state\\uploader\\token.json"
+file_stable_minutes: 5
+progress_every: 10
+log_type_mappings:
+  "PAS Test data": "PAS"
+  "HM-3203-011 Test data": "3203"
+  "HM-3903-011 Test data": "3903"
+  "LITE Test data": "LITE"
+ignore_dirs:
+  - fail

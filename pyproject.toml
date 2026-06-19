@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "log-csv-gather"
+version = "0.1.0"
+description = "Upload and download normalized CSV log files through Google Drive."
+requires-python = ">=3.11"
+dependencies = [
+  "google-api-python-client",
+  "google-auth-httplib2",
+  "google-auth-oauthlib",
+  "PyYAML",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+log-csv-gather = "log_csv_gather.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
