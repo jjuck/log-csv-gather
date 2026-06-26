@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Log CSV Gather - Dashboard</title>
+    <link rel="stylesheet" href="/static/app.css">
+  </head>
+  <body data-role="{{ role }}" data-setup-required="{% if setup_required %}true{% else %}false{% endif %}">
+    <header class="topbar">
+      <div class="brand-row">
+        <strong class="brand">CSV Ops Console</strong>
+        <span class="divider"></span>
+        <span class="meta">PC {{ pc_id }}</span>
+        <span class="meta role" data-current-role>{{ role }}</span>
+        <span class="port">PORT: {{ port }}</span>
+      </div>
+      <div class="time-row">
+        <button type="button" class="btn secondary compact" data-setup-open>초기설정</button>
+        <span id="current-time">--:--:--</span>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <section class="left-stack">
+        <article class="panel">
+          <div class="panel-title">
+            <h2>System Status</h2>
+            <span class="panel-mark">health</span>
+          </div>
+          <dl class="status-list">
+            <div>
+              <dt>Auth</dt>
+              <dd><span class="chip gray" data-health="auth"><span></span>대기</span></dd>
+            </div>
+            <div>
+              <dt>Doctor</dt>
+              <dd><span class="chip gray" data-health="doctor"><span></span>대기</span></dd>
+            </div>
+            <div>
+              <dt>Upload</dt>
+              <dd class="count-line" data-upload-counts>none</dd>
+            </div>
+            <div>
+              <dt>Download</dt>
+              <dd class="count-line" data-download-counts>none</dd>
+            </div>
+            <div class="path-row">
+              <dt>SQLite DB</dt>
+              <dd><code>{{ state_dir }}\state.sqlite</code></dd>
+            </div>
+          </dl>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>Scheduler</h2>
+            <span class="job-state" data-scheduler-state>조회 중</span>
+          </div>
+          <dl class="status-list">
+            <div>
+              <dt>등록</dt>
+              <dd><span class="chip gray" data-scheduler-registered><span></span>조회 중</span></dd>
+            </div>
+            <div>
+              <dt>활성</dt>
+              <dd><span class="chip gray" data-scheduler-enabled><span></span>{% if scheduler_enabled %}켜짐{% else %}꺼짐{% endif %}</span></dd>
+            </div>
+            <div>
+              <dt>간격</dt>
+              <dd class="scheduler-edit">
+                <input type="number" min="1" max="1439" value="{{ scheduler_interval }}" data-scheduler-interval>
+                <span>분</span>
+              </dd>
+            </div>
+            <div class="path-row">
+              <dt>작업 이름</dt>
+              <dd><code data-scheduler-task-name>{{ task_name }}</code></dd>
+            </div>
+            <div class="path-row">
+              <dt>실행 명령</dt>
+              <dd><code data-scheduler-command>-</code></dd>
+            </div>
+          </dl>
+          <div class="scheduler-actions">
+            <button type="button" class="btn primary" data-scheduler-register>등록/갱신</button>
+            <button type="button" class="btn secondary" data-scheduler-enable>활성</button>
+            <button type="button" class="btn secondary" data-scheduler-disable>비활성</button>
+            <button type="button" class="btn danger" data-scheduler-unregister>등록해제</button>
+          </div>
+        </article>
+      </section>
+
+      <section class="center-stack">
+        <article class="actions-panel">
+          <button type="button" class="btn primary action-btn" data-action="auth">Auth <span class="action-dot gray" data-action-status="auth"></span></button>
+          <button type="button" class="btn primary action-btn" data-action="doctor">Doctor <span class="action-dot gray" data-action-status="doctor"></span></button>
+          <span class="button-divider"></span>
+          <button type="button" class="btn secondary action-btn" data-action="upload-once" {% if role != "uploader" %}disabled{% endif %}>Upload Once <span class="action-dot gray" data-action-status="upload-once"></span></button>
+          <button type="button" class="btn secondary action-btn" data-action="upload-dry-run" {% if role != "uploader" %}disabled{% endif %}>Upload Dry-run <span class="action-dot gray" data-action-status="upload-dry-run"></span></button>
+          <button type="button" class="btn secondary action-btn" data-action="download-once" {% if role != "downloader" %}disabled{% endif %}>Download Once <span class="action-dot gray" data-action-status="download-once"></span></button>
+          <button type="button" class="btn secondary action-btn" data-action="download-dry-run" {% if role != "downloader" %}disabled{% endif %}>Download Dry-run <span class="action-dot gray" data-action-status="download-dry-run"></span></button>
+          <button type="button" class="btn icon" data-refresh-status aria-label="refresh">Refresh</button>
+        </article>
+
+        <article class="panel feed-panel">
+          <div class="panel-title">
+            <h2>Current Job Feed</h2>
+            <span class="job-state" data-job-state>idle</span>
+          </div>
+          <div class="feed-body">
+            <div class="job-summary" data-job-summary>실행 중인 작업이 없습니다.</div>
+            <div class="job-progress">
+              <div class="job-progress-track">
+                <div class="job-progress-bar" data-job-progress-bar></div>
+              </div>
+              <div class="job-progress-meta">
+                <span data-job-progress-text>0 / 0</span>
+                <span data-job-counts>success=0 skipped=0 failed=0 conflict=0</span>
+              </div>
+            </div>
+            <div class="feed-lines" data-feed></div>
+            <h3>Conflict / Failed</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Path</th>
+                  <th>Status</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody data-conflict-list>
+                <tr>
+                  <td colspan="3" class="muted">조회된 conflict/failed 항목이 없습니다.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="right-stack">
+        <article class="panel">
+          <div class="panel-title">
+            <h2>Config Summary</h2>
+            <span class="panel-mark">settings</span>
+          </div>
+          <div class="config-block">
+            <h3>PC Role</h3>
+            <dl>
+              <div><dt>현재 역할:</dt><dd><strong data-active-role>{{ role }}</strong></dd></div>
+              <div><dt>active.yaml:</dt><dd><span data-active-exists>{% if active_config_exists %}사용 중{% else %}없음{% endif %}</span></dd></div>
+            </dl>
+            <div class="role-actions">
+              <button type="button" class="btn secondary" data-setup-open>초기설정</button>
+              <button type="button" class="btn secondary" data-role-switch="uploader">현장 PC 업로드</button>
+              <button type="button" class="btn secondary" data-role-switch="downloader">관리 PC 다운로드</button>
+            </div>
+            <details class="support-tools">
+              <summary>지원 도구</summary>
+              <button type="button" class="btn danger" data-active-reset>active.yaml 초기화</button>
+            </details>
+          </div>
+          <div class="config-block">
+            <h3>Read Only Context</h3>
+            <dl>
+              <div><dt>role:</dt><dd data-context-role>{{ role }}</dd></div>
+              <div><dt>pc_id:</dt><dd data-context-pc-id>{{ pc_id }}</dd></div>
+              <div><dt>config:</dt><dd><code data-config-path>{{ config_path }}</code></dd></div>
+              <div><dt>Drive root:</dt><dd><code data-drive-root>{{ drive_root_folder_id }}</code></dd></div>
+              <div><dt>source:</dt><dd><code data-source-root>{{ source_root }}</code></dd></div>
+              <div><dt>download:</dt><dd><code data-download-root>{{ download_root }}</code></dd></div>
+              <div><dt>group:</dt><dd>{{ group_name }}</dd></div>
+              <div><dt>machine:</dt><dd data-machine-id>{{ machine_id }}</dd></div>
+            </dl>
+          </div>
+          <div class="config-block">
+            <h3>Runtime Settings</h3>
+            <label class="toggle-row">
+              <span>브라우저 자동 열기</span>
+              <input type="checkbox" {% if request.app.state.config.web.open_browser %}checked{% endif %} disabled>
+            </label>
+            <label class="toggle-row">
+              <span>웹 서버</span>
+              <code>{{ host }}:{{ port }}</code>
+            </label>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <section class="log-panel">
+      <div class="log-title">app.log (tailing)</div>
+      <pre data-log-tail>[local] log tail is loading...</pre>
+    </section>
+
+    <div class="modal-backdrop hidden" data-setup-modal>
+      <section class="setup-modal" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+        <form data-setup-form>
+          <div class="modal-title">
+            <h2 id="setup-title">초기설정</h2>
+            <button type="button" class="btn icon compact" data-setup-close aria-label="close">×</button>
+          </div>
+
+          <div class="setup-grid">
+            <label>
+              <span>역할</span>
+              <select data-setup-role name="role">
+                <option value="uploader" {% if role == "uploader" %}selected{% endif %}>현장 PC 업로드</option>
+                <option value="downloader" {% if role == "downloader" %}selected{% endif %}>관리 PC 다운로드</option>
+              </select>
+            </label>
+            <label>
+              <span>PC 이름</span>
+              <input type="text" name="pc_id" value="{{ pc_id }}" data-setup-pc-id>
+            </label>
+            <label class="wide">
+              <span>Drive root folder id</span>
+              <input type="text" name="drive_root_folder_id" value="{{ drive_root_folder_id }}" data-setup-drive-root>
+            </label>
+
+            <div class="role-panel wide" data-setup-role-panel="uploader">
+              <label>
+                <span>검사기명</span>
+                <input type="text" name="machine_id" value="{{ machine_id if machine_id != '-' else '성능검사기_1' }}" data-setup-machine-id>
+              </label>
+              <label class="path-picker">
+                <span>로그 폴더 위치</span>
+                <input type="text" name="source_root" value="{{ source_root if source_root != '-' else 'E:\\' }}" data-setup-source-root>
+                <button type="button" class="btn secondary" data-folder-open="source_root">찾아보기</button>
+              </label>
+            </div>
+
+            <div class="role-panel wide" data-setup-role-panel="downloader">
+              <label class="path-picker">
+                <span>다운로드 저장 폴더</span>
+                <input type="text" name="download_root" value="{{ download_root if download_root != '-' else '../runtime/downloads' }}" data-setup-download-root>
+                <button type="button" class="btn secondary" data-folder-open="download_root">찾아보기</button>
+              </label>
+            </div>
+          </div>
+
+          <div class="validation-box" data-path-validation>경로 검증 대기</div>
+
+          <div class="folder-browser hidden" data-folder-browser>
+            <div class="folder-browser-head">
+              <strong>폴더 선택</strong>
+              <button type="button" class="btn secondary compact" data-folder-browser-close>닫기</button>
+            </div>
+            <div class="drive-list" data-folder-drives></div>
+            <div class="folder-path"><code data-folder-current>-</code></div>
+            <div class="folder-list" data-folder-list></div>
+            <div class="folder-browser-actions">
+              <button type="button" class="btn primary" data-folder-choose>이 폴더 선택</button>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <span class="muted" data-setup-message></span>
+            <button type="button" class="btn secondary" data-setup-close>취소</button>
+            <button type="submit" class="btn primary">저장</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <footer class="footer">
+      <span>Log CSV Gather local dashboard</span>
+      <span>{{ url }}</span>
+    </footer>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

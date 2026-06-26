@@ -36,6 +36,8 @@ def scan_upload_candidates(config: AppConfig, now: datetime | None = None) -> li
         raise ValueError("scan_upload_candidates requires uploader config")
     if config.source_root is None or config.group_name is None or config.machine_id is None:
         raise ValueError("uploader config is incomplete")
+    if not config.source_root.is_dir():
+        raise ValueError(f"source_root does not exist or is not a directory: {config.source_root}")
 
     now = now or datetime.now(timezone.utc)
     stable_before = now.timestamp() - (config.file_stable_minutes * 60)

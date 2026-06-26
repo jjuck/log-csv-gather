@@ -24,13 +24,27 @@ def test_build_drive_service_uses_service_account_file_without_token(tmp_path: P
         calls["scopes"] = scopes
         return "service-account-credentials"
 
-    def fake_build(api_name, api_version, credentials):
-        calls["build"] = (api_name, api_version, credentials)
+    class FakeHttp:
+        def __init__(self, timeout):
+            calls["timeout"] = timeout
+
+    class FakeAuthorizedHttp:
+        def __init__(self, credentials, http):
+            self.credentials = credentials
+            self.http = http
+            calls["authorized_http"] = self
+
+    def fake_build(api_name, api_version, http, cache_discovery):
+        calls["build"] = (api_name, api_version, http, cache_discovery)
         return "drive-service"
 
+    import google_auth_httplib2
+    import httplib2
     import google.oauth2.service_account as service_account_module
     import googleapiclient.discovery as discovery_module
 
+    monkeypatch.setattr(httplib2, "Http", FakeHttp)
+    monkeypatch.setattr(google_auth_httplib2, "AuthorizedHttp", FakeAuthorizedHttp)
     monkeypatch.setattr(
         service_account_module.Credentials,
         "from_service_account_file",
@@ -43,5 +57,8 @@ def test_build_drive_service_uses_service_account_file_without_token(tmp_path: P
     assert service == "drive-service"
     assert calls["service_account_file"] == str(service_account_file)
     assert calls["scopes"] == ["https://www.googleapis.com/auth/drive"]
-    assert calls["build"] == ("drive", "v3", "service-account-credentials")
+    assert calls["timeout"] == 60
+    assert calls["authorized_http"].credentials == "service-account-credentials"
+    assert isinstance(calls["authorized_http"].http, FakeHttp)
+    assert calls["build"] == ("drive", "v3", calls["authorized_http"], False)
     assert not token_file.exists()

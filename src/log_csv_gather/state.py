@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -48,6 +50,18 @@ class DownloadRecord:
 
     def with_status(self, status: str, **changes: object) -> "DownloadRecord":
         return replace(self, status=status, **changes)
+
+
+@dataclass(frozen=True)
+class ActionResult:
+    action: str
+    status: str
+    tone: str
+    message: str
+    payload: dict[str, Any]
+    started_at: str | None = None
+    ended_at: str | None = None
+    error: str | None = None
 
 
 class StateRepository:
@@ -183,6 +197,62 @@ class StateRepository:
             rows = conn.execute(f"SELECT status, COUNT(*) AS count FROM {table} GROUP BY status").fetchall()
         return {str(row["status"]): int(row["count"]) for row in rows}
 
+    def list_by_status(self, table: str, status: str, limit: int = 20) -> list[UploadRecord] | list[DownloadRecord]:
+        if table not in {"uploads", "downloads"}:
+            raise ValueError("table must be uploads or downloads")
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT * FROM {table}
+                WHERE status = ?
+                ORDER BY last_attempt_at DESC, id DESC
+                LIMIT ?
+                """,
+                (status, limit),
+            ).fetchall()
+        if table == "uploads":
+            return [self._upload_from_row(row) for row in rows]
+        return [self._download_from_row(row) for row in rows]
+
+    def upsert_action_result(self, record: ActionResult) -> None:
+        payload_json = json.dumps(record.payload, ensure_ascii=False, sort_keys=True)
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO action_results (
+                  action, status, tone, message, payload_json, started_at, ended_at, error
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(action) DO UPDATE SET
+                  status=excluded.status,
+                  tone=excluded.tone,
+                  message=excluded.message,
+                  payload_json=excluded.payload_json,
+                  started_at=excluded.started_at,
+                  ended_at=excluded.ended_at,
+                  error=excluded.error
+                """,
+                (
+                    record.action,
+                    record.status,
+                    record.tone,
+                    record.message,
+                    payload_json,
+                    record.started_at,
+                    record.ended_at,
+                    record.error,
+                ),
+            )
+
+    def get_action_result(self, action: str) -> ActionResult | None:
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM action_results WHERE action = ?", (action,)).fetchone()
+        return self._action_result_from_row(row) if row else None
+
+    def list_action_results(self) -> list[ActionResult]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM action_results ORDER BY ended_at DESC, action ASC").fetchall()
+        return [self._action_result_from_row(row) for row in rows]
+
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
@@ -235,6 +305,20 @@ class StateRepository:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS action_results (
+                  action TEXT PRIMARY KEY,
+                  status TEXT NOT NULL,
+                  tone TEXT NOT NULL,
+                  message TEXT NOT NULL,
+                  payload_json TEXT NOT NULL,
+                  started_at TEXT,
+                  ended_at TEXT,
+                  error TEXT
+                )
+                """
+            )
 
     @staticmethod
     def _upload_from_row(row: sqlite3.Row) -> UploadRecord:
@@ -275,4 +359,21 @@ class StateRepository:
             downloaded_at=row["downloaded_at"],
             last_attempt_at=row["last_attempt_at"],
             last_error=row["last_error"],
+        )
+
+    @staticmethod
+    def _action_result_from_row(row: sqlite3.Row) -> ActionResult:
+        try:
+            payload = json.loads(row["payload_json"])
+        except json.JSONDecodeError:
+            payload = {}
+        return ActionResult(
+            action=row["action"],
+            status=row["status"],
+            tone=row["tone"],
+            message=row["message"],
+            payload=payload if isinstance(payload, dict) else {},
+            started_at=row["started_at"],
+            ended_at=row["ended_at"],
+            error=row["error"],
         )

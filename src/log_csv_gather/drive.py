@@ -37,15 +37,16 @@ class DriveAdapter(Protocol):
 class GoogleDriveAdapter:
     FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
 
-    def __init__(self, service: Any, root_folder_id: str) -> None:
+    def __init__(self, service: Any, root_folder_id: str, num_retries: int = 3) -> None:
         self.service = service
         self.root_folder_id = root_folder_id
+        self.num_retries = num_retries
         self._folder_cache: dict[tuple[str, str], str] = {}
 
     @classmethod
     def from_config(cls, config: Any) -> "GoogleDriveAdapter":
         service = build_drive_service(config)
-        return cls(service, config.drive_root_folder_id)
+        return cls(service, config.drive_root_folder_id, num_retries=config.drive_num_retries)
 
     def find_file(self, drive_path: str) -> DriveFile | None:
         parent_id, name = self._resolve_parent(drive_path, create=False)
@@ -65,8 +66,8 @@ class GoogleDriveAdapter:
         item = (
             self.service.files()
             .create(body=body, media_body=media, fields="id,name,size,md5Checksum,modifiedTime")
-            .execute()
         )
+        item = self._execute(item)
         return self._to_drive_file(item, drive_path)
 
     def list_files(self, prefix: str = "logs/") -> list[DriveFile]:
@@ -87,15 +88,15 @@ class GoogleDriveAdapter:
         metadata = (
             self.service.files()
             .get(fileId=drive_file_id, fields="id,name,size,md5Checksum,modifiedTime")
-            .execute()
         )
+        metadata = self._execute(metadata)
         request = self.service.files().get_media(fileId=drive_file_id)
         local_path.parent.mkdir(parents=True, exist_ok=True)
         with local_path.open("wb") as file:
             downloader = MediaIoBaseDownload(file, request)
             done = False
             while not done:
-                _, done = downloader.next_chunk()
+                _, done = downloader.next_chunk(num_retries=self.num_retries)
         return DriveFile(
             id=metadata["id"],
             path="",
@@ -117,15 +118,15 @@ class GoogleDriveAdapter:
             item = (
                 self.service.files()
                 .update(fileId=existing["id"], body=body, media_body=media, fields="id,name,size,md5Checksum,modifiedTime")
-                .execute()
             )
+            item = self._execute(item)
         else:
             body["parents"] = [parent_id]
             item = (
                 self.service.files()
                 .create(body=body, media_body=media, fields="id,name,size,md5Checksum,modifiedTime")
-                .execute()
             )
+            item = self._execute(item)
         return self._to_drive_file(item, drive_path)
 
     def _resolve_parent(self, drive_path: str, create: bool) -> tuple[str | None, str]:
@@ -149,7 +150,7 @@ class GoogleDriveAdapter:
                 if not create:
                     return None
                 body = {"name": part, "mimeType": self.FOLDER_MIME_TYPE, "parents": [current]}
-                child = self.service.files().create(body=body, fields="id,name").execute()
+                child = self._execute(self.service.files().create(body=body, fields="id,name"))
             current = child["id"]
             self._folder_cache[(parent_id, part)] = current
         return current
@@ -164,8 +165,8 @@ class GoogleDriveAdapter:
         response = (
             self.service.files()
             .list(q=query, spaces="drive", fields="files(id,name,size,md5Checksum,modifiedTime,mimeType)", pageSize=10)
-            .execute()
         )
+        response = self._execute(response)
         files = response.get("files", [])
         return files[0] if files else None
 
@@ -182,8 +183,8 @@ class GoogleDriveAdapter:
                     pageToken=page_token,
                     pageSize=1000,
                 )
-                .execute()
             )
+            response = self._execute(response)
             for item in response.get("files", []):
                 child_path = "/".join(part for part in [path_prefix, item["name"]] if part)
                 if item.get("mimeType") == self.FOLDER_MIME_TYPE:
@@ -205,21 +206,29 @@ class GoogleDriveAdapter:
             modified_time=item.get("modifiedTime", ""),
         )
 
+    def _execute(self, request: Any) -> Any:
+        return request.execute(num_retries=self.num_retries)
+
 
 def build_drive_service(config: Any) -> Any:
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from google.oauth2 import service_account
     from google_auth_oauthlib.flow import InstalledAppFlow
+    import google_auth_httplib2
+    import httplib2
     from googleapiclient.discovery import build
 
     scopes = ["https://www.googleapis.com/auth/drive"]
+    timeout_seconds = getattr(config, "drive_timeout_seconds", 60)
     if getattr(config, "service_account_file", None):
         credentials = service_account.Credentials.from_service_account_file(
             str(config.service_account_file),
             scopes=scopes,
         )
-        return build("drive", "v3", credentials=credentials)
+        http = httplib2.Http(timeout=timeout_seconds)
+        authorized_http = google_auth_httplib2.AuthorizedHttp(credentials, http=http)
+        return build("drive", "v3", http=authorized_http, cache_discovery=False)
 
     token_file = config.token_file or (config.state_dir / "token.json")
     credentials_file = config.credentials_file or (config.state_dir / "credentials.json")
@@ -236,4 +245,6 @@ def build_drive_service(config: Any) -> Any:
             credentials = flow.run_local_server(port=0)
         token_file.parent.mkdir(parents=True, exist_ok=True)
         token_file.write_text(credentials.to_json(), encoding="utf-8")
-    return build("drive", "v3", credentials=credentials)
+    http = httplib2.Http(timeout=timeout_seconds)
+    authorized_http = google_auth_httplib2.AuthorizedHttp(credentials, http=http)
+    return build("drive", "v3", http=authorized_http, cache_discovery=False)

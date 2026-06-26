@@ -4,11 +4,22 @@ group_name: Array_MIC
 machine_id: 성능검사기_1
 drive_root_folder_id: replace-with-google-drive-folder-id
 source_root: "E:\\"
-state_dir: "C:\\log-csv-gather\\state\\uploader"
-credentials_file: "C:\\log-csv-gather\\secrets\\oauth-client.json"
-token_file: "C:\\log-csv-gather\\state\\uploader\\token.json"
+state_dir: "../state/uploader"
+credentials_file: "../secrets/oauth-client.json"
+token_file: "../state/uploader/token.json"
 file_stable_minutes: 5
 progress_every: 10
+drive_timeout_seconds: 60
+drive_num_retries: 3
+web:
+  host: "127.0.0.1"
+  preferred_port: 8765
+  open_browser: true
+  browser_open_throttle_seconds: 3
+scheduler:
+  enabled: true
+  interval_minutes: 60
+  task_name:
 log_type_mappings:
   "PAS Test data": "PAS"
   "HM-3203-011 Test data": "3203"

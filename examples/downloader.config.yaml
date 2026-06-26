@@ -2,10 +2,21 @@ role: downloader
 pc_id: management-pc-01
 drive_root_folder_id: replace-with-google-drive-folder-id
 download_root: "D:\\downloaded-logs"
-state_dir: "C:\\log-csv-gather\\state\\downloader"
-credentials_file: "C:\\log-csv-gather\\secrets\\oauth-client.json"
-token_file: "C:\\log-csv-gather\\state\\downloader\\token.json"
+state_dir: "../state/downloader"
+credentials_file: "../secrets/oauth-client.json"
+token_file: "../state/downloader/token.json"
 progress_every: 10
+drive_timeout_seconds: 60
+drive_num_retries: 3
+web:
+  host: "127.0.0.1"
+  preferred_port: 8765
+  open_browser: true
+  browser_open_throttle_seconds: 3
+scheduler:
+  enabled: true
+  interval_minutes: 60
+  task_name:
 include_groups:
   - Array_MIC
 include_log_types:

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from log_csv_gather.state import DownloadRecord, StateRepository, UploadRecord
+from log_csv_gather.state import ActionResult, DownloadRecord, StateRepository, UploadRecord
 
 
 def test_upload_state_skips_uploaded_retries_failed_and_preserves_conflict(tmp_path: Path) -> None:
@@ -54,3 +54,40 @@ def test_download_state_skips_downloaded_retries_failed_and_preserves_conflict(t
 
     repo.upsert_download(downloaded.with_status("conflict", last_error="different content"))
     assert repo.should_process_download(downloaded.drive_file_id, downloaded.drive_size, downloaded.content_hash) is False
+
+
+def test_action_result_is_persisted_by_action_name(tmp_path: Path) -> None:
+    repo = StateRepository(tmp_path / "state.sqlite")
+
+    repo.upsert_action_result(
+        ActionResult(
+            action="upload-once",
+            status="succeeded",
+            tone="green",
+            message="uploaded all files",
+            payload={"processed_count": 2, "success_count": 2},
+            started_at="2026-06-25T01:00:00+00:00",
+            ended_at="2026-06-25T01:00:05+00:00",
+        )
+    )
+    repo.upsert_action_result(
+        ActionResult(
+            action="upload-once",
+            status="succeeded",
+            tone="yellow",
+            message="retryable failures remain",
+            payload={"processed_count": 2, "failed_count": 1},
+            started_at="2026-06-25T02:00:00+00:00",
+            ended_at="2026-06-25T02:00:07+00:00",
+            error="network timeout",
+        )
+    )
+
+    result = repo.get_action_result("upload-once")
+
+    assert result is not None
+    assert result.action == "upload-once"
+    assert result.tone == "yellow"
+    assert result.payload["failed_count"] == 1
+    assert result.error == "network timeout"
+    assert [item.action for item in repo.list_action_results()] == ["upload-once"]

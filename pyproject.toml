@@ -8,20 +8,27 @@ version = "0.1.0"
 description = "Upload and download normalized CSV log files through Google Drive."
 requires-python = ">=3.11"
 dependencies = [
+  "fastapi",
   "google-api-python-client",
   "google-auth-httplib2",
   "google-auth-oauthlib",
+  "Jinja2",
+  "protobuf<7",
   "PyYAML",
+  "uvicorn",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["httpx", "pytest"]
 
 [project.scripts]
 log-csv-gather = "log_csv_gather.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"log_csv_gather.web" = ["templates/*.html", "static/*.css", "static/*.js"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
