@@ -55,6 +55,27 @@ def test_upload_creates_expected_drive_path_and_repeated_run_skips_duplicate(tmp
     assert drive.json_by_path["status/uploaders/field-pc-01.json"]["last_error"] is None
 
 
+def test_upload_creates_smic_drive_path_when_smic_source_folder_exists(tmp_path: Path) -> None:
+    now = datetime(2026, 6, 18, 10, 0, tzinfo=timezone.utc)
+    source_root = tmp_path / "source"
+    _write_summary_file(source_root, "SMIC_Test data", "20260401", b"smic summary", now - timedelta(minutes=10))
+    config = AppConfig(
+        role="uploader",
+        pc_id="field-pc-01",
+        drive_root_folder_id="drive-root-id",
+        state_dir=tmp_path / "state",
+        source_root=source_root,
+        group_name="Array_MIC",
+        machine_id="machine-1",
+    )
+    drive = FakeDriveAdapter()
+
+    summary = run_upload(config, drive, StateRepository(tmp_path / "state" / "state.sqlite"), now=now)
+
+    assert summary.success_count == 1
+    assert "logs/Array_MIC/SMIC/machine-1/260401/260401_SMIC.csv" in drive.files_by_path
+
+
 def test_upload_existing_different_drive_content_records_conflict(tmp_path: Path) -> None:
     now = datetime(2026, 6, 18, 10, 0, tzinfo=timezone.utc)
     _write_file(

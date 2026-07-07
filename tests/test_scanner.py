@@ -25,6 +25,7 @@ def test_scanner_selects_only_stable_summary_csvs_and_builds_drive_path(tmp_path
     _write_file(tmp_path / "Unknown Test data" / "20260401" / "20260401_总数据.csv", b"unknown", old)
     _write_file(tmp_path / "fail" / "20260401" / "20260401_总数据.csv", b"fail", old)
     _write_file(tmp_path / "LITE Test data" / "20260401" / "20260401_总数据.csv", b"recent", recent)
+    _write_file(tmp_path / "SMIC_Test data" / "20260401" / "20260401_总数据.csv", b"smic", old)
 
     config = AppConfig(
         role="uploader",
@@ -39,7 +40,8 @@ def test_scanner_selects_only_stable_summary_csvs_and_builds_drive_path(tmp_path
     candidates = scan_upload_candidates(config, now=now)
 
     assert [candidate.drive_path for candidate in candidates] == [
-        "logs/Array_MIC/PAS/성능검사기_1/260401/260401_PAS.csv"
+        "logs/Array_MIC/PAS/성능검사기_1/260401/260401_PAS.csv",
+        "logs/Array_MIC/SMIC/성능검사기_1/260401/260401_SMIC.csv",
     ]
     assert candidates[0].source_date_yyyymmdd == "20260401"
     assert candidates[0].target_date_yymmdd == "260401"

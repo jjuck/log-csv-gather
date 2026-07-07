@@ -53,19 +53,20 @@ Log CSV Gather 사용자 안내
 
 5) Scheduler
    - Once 테스트가 정상일 때만 등록/갱신합니다.
-   - 기본 주기는 60분입니다.
+   - 기본 주기는 1시간입니다.
    - 대시보드에서 주기를 바꾸거나 등록/해제할 수 있습니다.
 
 
 3. 현장 PC 업로드 규칙
 ---------------------
 
-업로드 대상은 로그 폴더 아래의 다음 4개 폴더입니다.
+업로드 대상은 로그 폴더 아래의 다음 5개 폴더입니다.
 
 - PAS Test data
 - HM-3203-011 Test data
 - HM-3903-011 Test data
 - LITE Test data
+- SMIC_Test data
 
 다음 항목은 무시됩니다.
 
@@ -78,7 +79,7 @@ Log CSV Gather 사용자 안내
 
 Drive에는 다음 규칙으로 저장됩니다.
 
-logs/Array_MIC/{PAS|3203|3903|LITE}/{검사기명}/YYMMDD/YYMMDD_{type}.csv
+logs/Array_MIC/{PAS|3203|3903|LITE|SMIC}/{검사기명}/YYMMDD/YYMMDD_{type}.csv
 
 
 4. 화면 보는 법
@@ -125,7 +126,9 @@ logs/Array_MIC/{PAS|3203|3903|LITE}/{검사기명}/YYMMDD/YYMMDD_{type}.csv
 
 역할 자체를 바꿔야 할 때도 초기설정 창에서 현장 PC 업로드 또는 관리 PC 다운로드를 다시 선택할 수 있습니다.
 
-active.yaml 초기화 기능은 다음 실행 때 역할 선택부터 다시 시작하고 싶을 때 사용합니다.
+Config Summary의 설정 초기화 버튼은 기존 스케줄러 등록을 해제하고, 다음 실행 때 역할 선택부터 다시 시작하고 싶을 때 사용합니다.
+
+Config Summary의 로컬 상태 초기화 버튼은 이 PC의 처리 이력만 초기화하고 싶을 때 사용합니다. state.sqlite는 백업 후 비워지며, active.yaml 설정, token.json 인증, 원본 CSV, Google Drive 파일은 삭제하지 않습니다.
 
 스케줄러가 등록된 상태에서 역할 또는 주요 설정을 바꾸면, 안전을 위해 기존 스케줄러 등록은 해제될 수 있습니다. 설정 저장 후 Doctor, Dry-run, Once를 다시 확인하고 Scheduler를 다시 등록합니다.
 

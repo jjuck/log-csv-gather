@@ -31,7 +31,7 @@ Phase 1 of the next production hardening work adds an initial setup dialog:
   - downloader: PC name, Drive root folder ID, and download root folder.
 - PC name and machine name allow Korean text. Spaces are normalized to `_`; path-unsafe characters are rejected.
 - The default machine name is `성능검사기_1`.
-- The uploader log root is the parent folder containing the four mapped source folders.
+- The uploader log root is the parent folder containing the mapped source folders.
 - The downloader root is the local destination folder.
 
 The dashboard provides a local folder browser through FastAPI because the browser and Python server run on the same PC:
@@ -52,13 +52,14 @@ Folder browser rules:
 - Selecting a folder immediately runs path validation.
 - Validation warnings do not block saving.
 
-Uploader validation checks the four source folders:
+Uploader validation checks the five source folders:
 
 ```text
 PAS Test data
 HM-3203-011 Test data
 HM-3903-011 Test data
 LITE Test data
+SMIC_Test data
 ```
 
 Downloader validation checks whether the destination exists or can be created and written.
@@ -113,12 +114,13 @@ Phase 3 lets the local dashboard manage the hourly Windows Task Scheduler loop:
 
 - read the configured task name, interval, enabled flag, and current registration state
 - register or update the task from the dashboard
-- change the repeat interval in minutes
+- change the repeat interval in hours
 - enable or disable the registered task
 - unregister the task
 - persist scheduler changes back to the same YAML config
 - switch this PC between uploader and downloader active configs
-- reset `configs/active.yaml` for support
+- unregister the current scheduled task and reset `configs/active.yaml` from the visible Settings Reset button
+- reset the local SQLite processing state from the visible Local State Reset button
 
 ```text
 GET  /api/scheduler
@@ -129,7 +131,12 @@ POST /api/scheduler/unregister
 GET  /api/config/active
 POST /api/config/role
 POST /api/config/active/reset
+POST /api/state/reset
 ```
+
+`POST /api/state/reset` backs up `{state_dir}/state.sqlite` and clears only local processing history, action button state, conflict, and failed records. It preserves `active.yaml`, OAuth token files, original CSV files, and Google Drive files.
+
+`POST /api/config/active/reset` unregisters the current scheduled task when one exists, then deletes `configs/active.yaml`.
 
 `POST /api/scheduler/register` accepts:
 
@@ -140,7 +147,7 @@ POST /api/config/active/reset
 }
 ```
 
-The dashboard writes `scheduler.enabled` and `scheduler.interval_minutes` back to the config file before registering the task. The registered task calls the portable launcher when `run.bat` is present:
+The dashboard shows the interval in hours and sends the equivalent `interval_minutes` value to the API. It writes `scheduler.enabled` and `scheduler.interval_minutes` back to the config file before registering the task. The registered task calls the portable launcher when `run.bat` is present:
 
 ```text
 run.bat upload-once <config-path>

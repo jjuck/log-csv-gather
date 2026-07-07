@@ -40,6 +40,7 @@ state_dir: "{(tmp_path / "state").as_posix()}"
     assert config.log_type_mappings["HM-3203-011 Test data"] == "3203"
     assert config.log_type_mappings["HM-3903-011 Test data"] == "3903"
     assert config.log_type_mappings["LITE Test data"] == "LITE"
+    assert config.log_type_mappings["SMIC_Test data"] == "SMIC"
 
 
 def test_rejects_downloader_without_download_root(tmp_path: Path) -> None:

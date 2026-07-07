@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from log_csv_gather.state import ActionResult, DownloadRecord, StateRepository, UploadRecord
+from log_csv_gather.state import ActionResult, DownloadRecord, StateRepository, UploadRecord, reset_state_database
 
 
 def test_upload_state_skips_uploaded_retries_failed_and_preserves_conflict(tmp_path: Path) -> None:
@@ -91,3 +91,44 @@ def test_action_result_is_persisted_by_action_name(tmp_path: Path) -> None:
     assert result.payload["failed_count"] == 1
     assert result.error == "network timeout"
     assert [item.action for item in repo.list_action_results()] == ["upload-once"]
+
+
+def test_reset_state_database_backs_up_existing_db_and_recreates_empty_state(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite"
+    repo = StateRepository(db_path)
+    upload = UploadRecord(
+        source_path="E:/PAS Test data/20260401/20260401_总数据.csv",
+        drive_file_id="drive-1",
+        drive_path="logs/Array_MIC/PAS/성능검사기_1/260401/260401_PAS.csv",
+        group_name="Array_MIC",
+        log_type="PAS",
+        machine_id="성능검사기_1",
+        source_date_yyyymmdd="20260401",
+        target_date_yymmdd="260401",
+        source_size=3,
+        source_mtime=100.0,
+        content_hash="md5-a",
+        status="uploaded",
+    )
+    repo.upsert_upload(upload)
+    repo.upsert_action_result(
+        ActionResult(
+            action="upload-once",
+            status="succeeded",
+            tone="green",
+            message="uploaded",
+            payload={"success_count": 1},
+        )
+    )
+
+    result = reset_state_database(db_path)
+
+    assert result["state_db"] == str(db_path)
+    assert result["reset"] is True
+    assert result["backup_path"] is not None
+    backup_repo = StateRepository(Path(str(result["backup_path"])))
+    assert backup_repo.count_by_status("uploads") == {"uploaded": 1}
+    reset_repo = StateRepository(db_path)
+    assert reset_repo.count_by_status("uploads") == {}
+    assert reset_repo.count_by_status("downloads") == {}
+    assert reset_repo.list_action_results() == []

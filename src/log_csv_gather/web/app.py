@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from log_csv_gather.active_config import ActiveConfigError, ActiveConfigManager
 from log_csv_gather.config import AppConfig, ConfigError, update_scheduler_settings
 from log_csv_gather.scheduler import SchedulerError, WindowsTaskScheduler
+from log_csv_gather.state import reset_state_database
 from log_csv_gather.web.actions import (
     ActionRunner,
     DefaultActionRunner,
@@ -26,6 +27,7 @@ from log_csv_gather.web.runtime import build_url
 
 WEB_DIR = Path(__file__).parent
 TEMPLATES = Jinja2Templates(directory=str(WEB_DIR / "templates"))
+MAX_SCHEDULER_INTERVAL_HOURS = 23
 
 
 class SchedulerRequest(BaseModel):
@@ -50,6 +52,10 @@ class SetupRequest(BaseModel):
     machine_id: str | None = None
     source_root: str | None = None
     download_root: str | None = None
+
+
+def _scheduler_interval_hours(interval_minutes: int) -> int:
+    return min(MAX_SCHEDULER_INTERVAL_HOURS, max(1, (interval_minutes + 59) // 60))
 
 
 def create_app(
@@ -146,6 +152,13 @@ def create_app(
     async def get_status(details: bool = False) -> dict[str, object]:
         return local_status_payload(current_config(), details=details)
 
+    @app.post("/api/state/reset")
+    async def reset_local_state() -> dict[str, object]:
+        manager: JobManager = app.state.job_manager
+        if manager.has_active_jobs():
+            raise HTTPException(status_code=409, detail="cannot reset local state while a job is running")
+        return reset_state_database(current_config().state_dir / "state.sqlite")
+
     @app.get("/api/logs/tail")
     async def get_log_tail(lines: int = Query(100, ge=1, le=1000)) -> dict[str, object]:
         return {"lines": tail_log_lines(current_config(), lines=lines)}
@@ -240,9 +253,15 @@ def create_app(
     @app.post("/api/config/active/reset")
     async def reset_active_config() -> dict[str, object]:
         try:
+            scheduler_status = scheduler_service().status()
+            scheduler_unregistered = False
+            if scheduler_status.registered:
+                scheduler_service().unregister()
+                scheduler_unregistered = True
             result = active_config_manager().reset()
-        except (ActiveConfigError, ConfigError, ValueError) as exc:
+        except (ActiveConfigError, ConfigError, SchedulerError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        result["scheduler_unregistered"] = scheduler_unregistered
         result["restart_recommended"] = True
         result["role"] = current_config().role
         return result
@@ -299,7 +318,7 @@ def create_app(
                 "drive_root_folder_id": cfg.drive_root_folder_id,
                 "group_name": cfg.group_name or "-",
                 "machine_id": cfg.machine_id or "-",
-                "scheduler_interval": cfg.scheduler.interval_minutes,
+                "scheduler_interval_hours": _scheduler_interval_hours(cfg.scheduler.interval_minutes),
                 "scheduler_enabled": cfg.scheduler.enabled,
                 "task_name": cfg.scheduler.task_name or f"LogCsvGather-{cfg.pc_id}-{cfg.role}",
                 "active_config_path": active_status["active_path"],

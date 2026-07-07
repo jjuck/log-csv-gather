@@ -25,5 +25,6 @@ log_type_mappings:
   "HM-3203-011 Test data": "3203"
   "HM-3903-011 Test data": "3903"
   "LITE Test data": "LITE"
+  "SMIC_Test data": "SMIC"
 ignore_dirs:
   - fail

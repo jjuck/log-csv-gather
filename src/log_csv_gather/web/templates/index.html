@@ -69,8 +69,8 @@
             <div>
               <dt>간격</dt>
               <dd class="scheduler-edit">
-                <input type="number" min="1" max="1439" value="{{ scheduler_interval }}" data-scheduler-interval>
-                <span>분</span>
+                <input type="number" min="1" max="23" step="1" value="{{ scheduler_interval_hours }}" data-scheduler-interval>
+                <span>시간</span>
               </dd>
             </div>
             <div class="path-row">
@@ -151,15 +151,10 @@
               <div><dt>현재 역할:</dt><dd><strong data-active-role>{{ role }}</strong></dd></div>
               <div><dt>active.yaml:</dt><dd><span data-active-exists>{% if active_config_exists %}사용 중{% else %}없음{% endif %}</span></dd></div>
             </dl>
-            <div class="role-actions">
-              <button type="button" class="btn secondary" data-setup-open>초기설정</button>
-              <button type="button" class="btn secondary" data-role-switch="uploader">현장 PC 업로드</button>
-              <button type="button" class="btn secondary" data-role-switch="downloader">관리 PC 다운로드</button>
+            <div class="config-actions">
+              <button type="button" class="btn danger" data-active-reset>설정 초기화</button>
+              <button type="button" class="btn danger" data-state-reset>로컬 상태 초기화</button>
             </div>
-            <details class="support-tools">
-              <summary>지원 도구</summary>
-              <button type="button" class="btn danger" data-active-reset>active.yaml 초기화</button>
-            </details>
           </div>
           <div class="config-block">
             <h3>Read Only Context</h3>

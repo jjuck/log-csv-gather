@@ -449,7 +449,7 @@ select {
   gap: 8px;
 }
 
-.role-actions {
+.config-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;

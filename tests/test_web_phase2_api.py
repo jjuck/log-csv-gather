@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from log_csv_gather.config import AppConfig
-from log_csv_gather.state import StateRepository, UploadRecord
+from log_csv_gather.state import ActionResult, StateRepository, UploadRecord
 from log_csv_gather.web.app import create_app
 from log_csv_gather.web.jobs import JobManager
 
@@ -147,6 +147,56 @@ def test_status_api_returns_counts_and_conflict_details(tmp_path: Path) -> None:
     assert payload["downloads"] == {}
     assert payload["upload_conflicts"][0]["drive_path"] == "logs/Array_MIC/PAS/machine-1/260401/260401_PAS.csv"
     assert payload["upload_conflicts"][0]["last_error"] == "different content"
+
+
+def test_local_state_reset_api_clears_sqlite_without_touching_config_or_token(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    config_path = tmp_path / "config.yaml"
+    token_path = config.state_dir / "token.json"
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text("token", encoding="utf-8")
+    config_path.write_text("role: uploader\n", encoding="utf-8")
+    repo = StateRepository(config.state_dir / "state.sqlite")
+    repo.upsert_upload(
+        UploadRecord(
+            source_path="E:/PAS/20260401/20260401_summary.csv",
+            drive_file_id="drive-1",
+            drive_path="logs/Array_MIC/PAS/machine-1/260401/260401_PAS.csv",
+            group_name="Array_MIC",
+            log_type="PAS",
+            machine_id="machine-1",
+            source_date_yyyymmdd="20260401",
+            target_date_yymmdd="260401",
+            source_size=10,
+            source_mtime=1.0,
+            content_hash="hash",
+            status="uploaded",
+        )
+    )
+    repo.upsert_action_result(
+        ActionResult(
+            action="upload-once",
+            status="succeeded",
+            tone="green",
+            message="uploaded",
+            payload={"success_count": 1},
+        )
+    )
+    app = create_app(config, config_path=config_path, port=8765)
+    client = TestClient(app)
+
+    response = client.post("/api/state/reset")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["reset"] is True
+    assert payload["backup_path"]
+    assert token_path.read_text(encoding="utf-8") == "token"
+    assert config_path.read_text(encoding="utf-8") == "role: uploader\n"
+    status = client.get("/api/status?details=true").json()
+    assert status["uploads"] == {}
+    assert status["downloads"] == {}
+    assert status["actions"] == {}
 
 
 def test_log_tail_api_returns_recent_app_log_lines(tmp_path: Path) -> None:

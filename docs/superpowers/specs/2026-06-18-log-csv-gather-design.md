@@ -62,9 +62,12 @@ E:\
   LITE Test data\
     20260401\
       20260401_总数据.csv        # uploaded
+  SMIC_Test data\
+    20260401\
+      20260401_总数据.csv        # uploaded
 ```
 
-Only these four source folders are processed:
+Only these five source folders are processed:
 
 | Source folder | Normalized log type |
 | --- | --- |
@@ -72,6 +75,7 @@ Only these four source folders are processed:
 | `HM-3203-011 Test data` | `3203` |
 | `HM-3903-011 Test data` | `3903` |
 | `LITE Test data` | `LITE` |
+| `SMIC_Test data` | `SMIC` |
 
 The uploader ignores:
 

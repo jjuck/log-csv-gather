@@ -130,6 +130,7 @@ def test_validate_path_api_reports_uploader_folder_coverage(tmp_path: Path) -> N
     assert payload["found_count"] == 1
     assert "PAS Test data" in payload["found"]
     assert "LITE Test data" in payload["missing"]
+    assert "SMIC_Test data" in payload["missing"]
 
 
 def test_folder_browser_lists_folders_without_files(tmp_path: Path) -> None:

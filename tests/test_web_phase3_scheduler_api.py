@@ -199,12 +199,21 @@ def test_active_config_api_switches_role_and_unregistered_existing_task(tmp_path
 def test_active_config_reset_api_deletes_active_yaml(tmp_path: Path) -> None:
     active_path = _write_role_configs(tmp_path)
     config = load_config(active_path)
-    app = create_app(config, config_path=active_path, port=8765)
+    fake = FakeSchedulerService(config)
+    fake.registered = True
+    app = create_app(
+        config,
+        config_path=active_path,
+        port=8765,
+        scheduler_service_factory=lambda _: fake,
+    )
     client = TestClient(app)
 
     response = client.post("/api/config/active/reset")
 
     assert response.status_code == 200
     assert response.json()["deleted"] is True
+    assert response.json()["scheduler_unregistered"] is True
     assert response.json()["restart_recommended"] is True
+    assert fake.registered is False
     assert not active_path.exists()

@@ -24,3 +24,4 @@ include_log_types:
   - "3203"
   - "3903"
   - LITE
+  - SMIC

@@ -12,6 +12,7 @@ DEFAULT_LOG_TYPE_MAPPINGS = {
     "HM-3203-011 Test data": "3203",
     "HM-3903-011 Test data": "3903",
     "LITE Test data": "LITE",
+    "SMIC_Test data": "SMIC",
 }
 
 VALID_ROLES = {"uploader", "downloader"}
@@ -165,7 +166,7 @@ def _build_config(raw: dict[str, Any], config_path: Path) -> AppConfig:
         progress_every=int(raw.get("progress_every", 10)),
         drive_timeout_seconds=int(raw.get("drive_timeout_seconds", 60)),
         drive_num_retries=int(raw.get("drive_num_retries", 3)),
-        log_type_mappings=_string_dict(raw.get("log_type_mappings")) or dict(DEFAULT_LOG_TYPE_MAPPINGS),
+        log_type_mappings=_log_type_mappings(raw.get("log_type_mappings")),
         ignore_dirs=_string_list(raw.get("ignore_dirs")) or ["fail"],
         include_groups=_string_list(raw.get("include_groups")),
         include_log_types=_string_list(raw.get("include_log_types")),
@@ -236,6 +237,12 @@ def _string_dict(value: Any) -> dict[str, str]:
     if not isinstance(value, dict):
         raise ConfigError("log_type_mappings must be a mapping")
     return {str(key): str(item) for key, item in value.items()}
+
+
+def _log_type_mappings(value: Any) -> dict[str, str]:
+    mappings = dict(DEFAULT_LOG_TYPE_MAPPINGS)
+    mappings.update(_string_dict(value))
+    return mappings
 
 
 def _string_list(value: Any) -> list[str]:

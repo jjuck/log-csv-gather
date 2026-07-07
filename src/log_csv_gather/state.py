@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -253,6 +254,17 @@ class StateRepository:
             rows = conn.execute("SELECT * FROM action_results ORDER BY ended_at DESC, action ASC").fetchall()
         return [self._action_result_from_row(row) for row in rows]
 
+    def clear(self) -> None:
+        conn = self._connect()
+        try:
+            conn.execute("DELETE FROM uploads")
+            conn.execute("DELETE FROM downloads")
+            conn.execute("DELETE FROM action_results")
+            conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('uploads', 'downloads')")
+            conn.commit()
+        finally:
+            conn.close()
+
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
@@ -377,3 +389,41 @@ class StateRepository:
             ended_at=row["ended_at"],
             error=row["error"],
         )
+
+
+def reset_state_database(db_path: Path) -> dict[str, object]:
+    path = Path(db_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    backup_path: Path | None = None
+    existed = path.exists()
+    if existed:
+        backup_path = _next_backup_path(path)
+        _backup_sqlite_database(path, backup_path)
+    repo = StateRepository(path)
+    repo.clear()
+    return {
+        "reset": True,
+        "state_db": str(path),
+        "backup_path": str(backup_path) if backup_path else None,
+        "had_existing_db": existed,
+    }
+
+
+def _backup_sqlite_database(source_path: Path, backup_path: Path) -> None:
+    source = sqlite3.connect(source_path)
+    target = sqlite3.connect(backup_path)
+    try:
+        source.backup(target)
+    finally:
+        target.close()
+        source.close()
+
+
+def _next_backup_path(path: Path) -> Path:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    candidate = path.with_name(f"{path.name}.bak-{timestamp}")
+    index = 1
+    while candidate.exists():
+        candidate = path.with_name(f"{path.name}.bak-{timestamp}-{index}")
+        index += 1
+    return candidate

@@ -25,7 +25,7 @@ After the dashboard opens:
 5. Run Once.
 6. Register the scheduler from the Scheduler panel only after checks pass.
 
-Saving setup never registers the scheduler automatically. If setup changes are saved while a scheduled task is already registered, the dashboard unregisters the old task and shows that registration is needed again.
+Saving setup never registers the scheduler automatically. If setup changes are saved or Settings Reset is used while a scheduled task is already registered, the dashboard unregisters the old task and shows that registration is needed again.
 
 ## Recommended Auth Mode
 
@@ -51,7 +51,7 @@ Service account UX is not part of the current operator flow.
 
 ## Dashboard Scheduler Control
 
-The dashboard can query, register/update, enable, disable, and unregister the hourly task.
+The dashboard can query, register/update, enable, disable, and unregister the hourly task. The UI shows the repeat interval in hours; the YAML stores the equivalent minutes for compatibility.
 
 The scheduler panel persists these values back to `configs\active.yaml`:
 

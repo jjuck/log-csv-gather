@@ -4,7 +4,10 @@ const state = {
   doctorVerificationRequired: false,
   folderTarget: null,
   currentFolder: null,
+  activeConfig: null,
 };
+
+const maxSchedulerIntervalHours = 23;
 
 function updateCurrentTime() {
   const target = document.getElementById("current-time");
@@ -127,13 +130,13 @@ async function registerScheduler() {
     if (!ok) return;
   }
   const intervalInput = document.querySelector("[data-scheduler-interval]");
-  const interval = Number(intervalInput ? intervalInput.value : 60);
-  if (!Number.isInteger(interval) || interval < 1 || interval > 1439) {
-    setJobSummary("스케줄러 간격은 1분부터 1439분까지 입력할 수 있습니다.");
+  const intervalHours = Number(intervalInput ? intervalInput.value : 1);
+  if (!Number.isInteger(intervalHours) || intervalHours < 1 || intervalHours > maxSchedulerIntervalHours) {
+    setJobSummary(`스케줄러 간격은 1시간부터 ${maxSchedulerIntervalHours}시간까지 입력할 수 있습니다.`);
     return;
   }
   await runSchedulerRequest("/api/scheduler/register", {
-    interval_minutes: interval,
+    interval_minutes: schedulerHoursToMinutes(intervalHours),
     enabled: true,
   });
 }
@@ -186,14 +189,32 @@ async function switchRole(role) {
 }
 
 async function resetActiveConfig() {
-  if (!window.confirm("active.yaml을 초기화할까요? 다음 run.bat 실행 때 역할을 다시 선택합니다.")) return;
+  if (!window.confirm("설정을 초기화할까요? 등록된 스케줄러가 있으면 해제하고, 다음 run.bat 실행 때 역할을 다시 선택합니다.")) return;
   setRoleButtonsDisabled(true);
   try {
     const payload = await fetchJson("/api/config/active/reset", { method: "POST" });
     renderActiveConfig(payload);
-    setJobSummary("active.yaml 초기화 완료. 다음 run.bat 실행 때 역할을 다시 선택합니다.");
+    const schedulerNote = payload.scheduler_unregistered ? " 기존 스케줄러는 등록해제되었습니다." : "";
+    setJobSummary(`설정 초기화 완료.${schedulerNote} 다음 run.bat 실행 때 역할을 다시 선택합니다.`);
   } catch (error) {
-    setJobSummary(`active.yaml 초기화 실패: ${error.message}`);
+    setJobSummary(`설정 초기화 실패: ${error.message}`);
+  } finally {
+    setRoleButtonsDisabled(false);
+  }
+}
+
+async function resetLocalState() {
+  if (!window.confirm("로컬 처리 이력을 초기화할까요? state.sqlite만 백업 후 초기화하며 설정, token.json, 원본 CSV, Google Drive 파일은 유지됩니다.")) return;
+  setRoleButtonsDisabled(true);
+  try {
+    const payload = await fetchJson("/api/state/reset", { method: "POST" });
+    const backupNote = payload.backup_path ? ` 백업: ${payload.backup_path}` : " 기존 DB 없음.";
+    setJobState("idle");
+    updateJobProgress(null);
+    setJobSummary(`로컬 상태 초기화 완료.${backupNote}`);
+    await refreshAll();
+  } catch (error) {
+    setJobSummary(`로컬 상태 초기화 실패: ${error.message}`);
   } finally {
     setRoleButtonsDisabled(false);
   }
@@ -204,8 +225,8 @@ function renderScheduler(payload) {
   setText("[data-scheduler-task-name]", payload.task_name || "-");
   setText("[data-scheduler-command]", payload.command || "-");
   const intervalInput = document.querySelector("[data-scheduler-interval]");
-  if (intervalInput && payload.configured_interval_minutes) {
-    intervalInput.value = payload.configured_interval_minutes;
+  if (intervalInput && payload.configured_interval_minutes && !isSchedulerIntervalFocused()) {
+    intervalInput.value = schedulerMinutesToHours(payload.configured_interval_minutes);
   }
   renderChip(
     "[data-scheduler-registered]",
@@ -216,8 +237,24 @@ function renderScheduler(payload) {
   renderChip("[data-scheduler-enabled]", enabled ? "켜짐" : "꺼짐", enabled ? "blue" : "gray");
 }
 
+function schedulerMinutesToHours(minutes) {
+  const value = Number(minutes);
+  if (!Number.isFinite(value) || value <= 0) return 1;
+  return Math.max(1, Math.min(maxSchedulerIntervalHours, Math.ceil(value / 60)));
+}
+
+function schedulerHoursToMinutes(hours) {
+  return Number(hours) * 60;
+}
+
+function isSchedulerIntervalFocused() {
+  const intervalInput = document.querySelector("[data-scheduler-interval]");
+  return Boolean(intervalInput && document.activeElement === intervalInput);
+}
+
 function renderActiveConfig(payload) {
   if (!payload) return;
+  state.activeConfig = payload;
   state.doctorVerificationRequired = Boolean(payload.setup_required || state.doctorVerificationRequired);
   setText("[data-active-role]", payload.role || "-");
   setText("[data-current-role]", payload.role || "-");
@@ -229,7 +266,9 @@ function renderActiveConfig(payload) {
   setText("[data-source-root]", payload.source_root || "-");
   setText("[data-download-root]", payload.download_root || "-");
   setText("[data-machine-id]", payload.machine_id || "-");
-  fillSetupForm(payload);
+  if (!isSetupModalOpen()) {
+    fillSetupForm(payload);
+  }
 }
 
 function renderChip(selector, text, colorClass) {
@@ -336,7 +375,7 @@ function setSchedulerButtonsDisabled(disabled) {
 }
 
 function setRoleButtonsDisabled(disabled) {
-  document.querySelectorAll("[data-role-switch], [data-active-reset]").forEach((button) => {
+  document.querySelectorAll("[data-role-switch], [data-active-reset], [data-state-reset]").forEach((button) => {
     button.disabled = disabled;
   });
 }
@@ -351,6 +390,11 @@ function fillSetupForm(payload) {
   updateSetupRoleFields();
 }
 
+function isSetupModalOpen() {
+  const modal = document.querySelector("[data-setup-modal]");
+  return modal ? !modal.classList.contains("hidden") : false;
+}
+
 function setValue(selector, value) {
   const target = document.querySelector(selector);
   if (target && value !== null && value !== undefined) target.value = value;
@@ -359,6 +403,9 @@ function setValue(selector, value) {
 function openSetupModal() {
   const modal = document.querySelector("[data-setup-modal]");
   if (!modal) return;
+  if (state.activeConfig) {
+    fillSetupForm(state.activeConfig);
+  }
   modal.classList.remove("hidden");
   updateSetupRoleFields();
   validateSelectedSetupPath().catch(() => undefined);
@@ -572,6 +619,11 @@ if (folderChooseButton) {
 const activeResetButton = document.querySelector("[data-active-reset]");
 if (activeResetButton) {
   activeResetButton.addEventListener("click", resetActiveConfig);
+}
+
+const stateResetButton = document.querySelector("[data-state-reset]");
+if (stateResetButton) {
+  stateResetButton.addEventListener("click", resetLocalState);
 }
 
 const refreshButton = document.querySelector("[data-refresh-status]");

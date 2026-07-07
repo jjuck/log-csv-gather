@@ -99,6 +99,10 @@ class JobManager:
         with self._lock:
             return list(reversed(self._feed[-limit:]))
 
+    def has_active_jobs(self) -> bool:
+        with self._lock:
+            return any(job.status in {"queued", "running"} for job in self._jobs.values())
+
     def _run_job(self, job_id: str, callback: JobCallable) -> None:
         with self._lock:
             job = self._jobs[job_id]

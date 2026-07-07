@@ -47,6 +47,10 @@ The selected template is copied to `configs\active.yaml`. Future launches use `a
 
 The dashboard Setup button is the preferred way to finish or correct PC-specific settings. Setup edits only `configs\active.yaml`; production configs remain templates.
 
+The dashboard Settings Reset button unregisters any existing scheduled task and deletes `configs\active.yaml` so the next `run.bat` launch starts again from role selection.
+
+The dashboard Local State Reset button backs up and clears only `{state_dir}\state.sqlite`. It clears local upload/download history, action button state, conflict, and failed records. It does not delete `active.yaml`, OAuth `token.json`, original CSV logs, or Google Drive files.
+
 Setup fields:
 
 - role: field PC uploader or management PC downloader
@@ -56,7 +60,7 @@ Setup fields:
 - uploader log root folder, usually `E:\`
 - downloader download root folder
 
-The setup dialog includes a local folder browser. It shows drives and folders from the current PC, hides files, and validates the selected folder immediately. For uploaders, validation checks whether the four expected source folders are present. For downloaders, validation checks whether the destination can be created and written.
+The setup dialog includes a local folder browser. It shows drives and folders from the current PC, hides files, and validates the selected folder immediately. For uploaders, validation checks whether the expected source folders are present. For downloaders, validation checks whether the destination can be created and written.
 
 Saving setup does not run Doctor and does not register the scheduler. After saving, run Doctor manually from the dashboard and review the result before registering the scheduled task.
 
@@ -101,6 +105,7 @@ log_type_mappings:
   "HM-3203-011 Test data": "3203"
   "HM-3903-011 Test data": "3903"
   "LITE Test data": "LITE"
+  "SMIC_Test data": "SMIC"
 ignore_dirs:
   - fail
 ```
@@ -138,6 +143,7 @@ include_log_types:
   - "3203"
   - "3903"
   - LITE
+  - SMIC
 ```
 
 ## 5. OAuth Setup
@@ -170,7 +176,7 @@ Before registering the hourly task:
 
 Then use the dashboard Scheduler panel:
 
-1. Set the interval in minutes. The default is `60`.
+1. Set the interval in hours. The default is `1`.
 2. Click register/update.
 3. Confirm the task is registered and enabled.
 
