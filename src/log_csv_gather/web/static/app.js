@@ -5,6 +5,7 @@ const state = {
   folderTarget: null,
   currentFolder: null,
   activeConfig: null,
+  schedulerIntervalDirty: false,
 };
 
 const maxSchedulerIntervalHours = 23;
@@ -157,6 +158,9 @@ async function runSchedulerRequest(url, body = null) {
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
     });
+    if (url === "/api/scheduler/register") {
+      state.schedulerIntervalDirty = false;
+    }
     renderScheduler(payload);
     setJobSummary(`스케줄러 처리 완료: ${payload.task_name}`);
   } catch (error) {
@@ -225,7 +229,12 @@ function renderScheduler(payload) {
   setText("[data-scheduler-task-name]", payload.task_name || "-");
   setText("[data-scheduler-command]", payload.command || "-");
   const intervalInput = document.querySelector("[data-scheduler-interval]");
-  if (intervalInput && payload.configured_interval_minutes && !isSchedulerIntervalFocused()) {
+  if (
+    intervalInput &&
+    payload.configured_interval_minutes &&
+    !isSchedulerIntervalFocused() &&
+    !isSchedulerIntervalDirty()
+  ) {
     intervalInput.value = schedulerMinutesToHours(payload.configured_interval_minutes);
   }
   renderChip(
@@ -250,6 +259,14 @@ function schedulerHoursToMinutes(hours) {
 function isSchedulerIntervalFocused() {
   const intervalInput = document.querySelector("[data-scheduler-interval]");
   return Boolean(intervalInput && document.activeElement === intervalInput);
+}
+
+function isSchedulerIntervalDirty() {
+  return state.schedulerIntervalDirty;
+}
+
+function markSchedulerIntervalDirty() {
+  state.schedulerIntervalDirty = true;
 }
 
 function renderActiveConfig(payload) {
@@ -634,6 +651,12 @@ if (refreshButton) {
 const registerButton = document.querySelector("[data-scheduler-register]");
 if (registerButton) {
   registerButton.addEventListener("click", registerScheduler);
+}
+
+const schedulerIntervalInput = document.querySelector("[data-scheduler-interval]");
+if (schedulerIntervalInput) {
+  schedulerIntervalInput.addEventListener("input", markSchedulerIntervalDirty);
+  schedulerIntervalInput.addEventListener("change", markSchedulerIntervalDirty);
 }
 
 const unregisterButton = document.querySelector("[data-scheduler-unregister]");

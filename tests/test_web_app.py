@@ -129,6 +129,22 @@ def test_scheduler_interval_is_edited_as_hours_without_refresh_overwrite() -> No
     assert "interval_minutes: schedulerHoursToMinutes(intervalHours)" in app_js
 
 
+def test_scheduler_interval_edit_is_not_reset_after_input_blur() -> None:
+    app_js = Path("src/log_csv_gather/web/static/app.js").read_text(encoding="utf-8")
+
+    assert "schedulerIntervalDirty: false" in app_js
+    assert "function isSchedulerIntervalDirty()" in app_js
+    assert 'state.schedulerIntervalDirty = true;' in app_js
+    assert 'state.schedulerIntervalDirty = false;' in app_js
+    render_scheduler = re.search(
+        r"function renderScheduler\(payload\) \{(?P<body>.*?)\n\}",
+        app_js,
+        re.DOTALL,
+    )
+    assert render_scheduler is not None
+    assert "!isSchedulerIntervalDirty()" in render_scheduler.group("body")
+
+
 def test_local_state_reset_button_calls_reset_api() -> None:
     app_js = Path("src/log_csv_gather/web/static/app.js").read_text(encoding="utf-8")
 
